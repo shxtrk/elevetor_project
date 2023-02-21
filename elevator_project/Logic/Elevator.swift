@@ -47,6 +47,7 @@ class Elevator {
     }
     
     private let queue = OperationQueue()
+    
     private let lock = NSLock()
     
     init(id: Int, maxFloor: Int) {
@@ -65,11 +66,16 @@ class Elevator {
         self.direction = direction
         state = .moving
         
-        let moveOperation = BlockOperation {
+        var moveOperation = BlockOperation()
+        
+        moveOperation.addExecutionBlock { [unowned moveOperation] in
             self.lock.lock()
             
             if let targetFloor = self.targetFloor {
                 while self.currentFloor != targetFloor {
+                    if moveOperation.isCancelled {
+                        break
+                    }
                     if self.direction == .up {
                         self.currentFloor += 1
                     } else {
@@ -87,19 +93,20 @@ class Elevator {
                     sleep(1)
                 }
                 
-                self.targetFloor = nil
+                if !moveOperation.isCancelled {
+                    self.targetFloor = nil
+                }
                 self.state = .idle
             }
             
             self.lock.unlock()
         }
         
-//        moveOperation.cancel()
         queue.addOperation(moveOperation)
     }
     
     func stop() {
-//        queue.op
+        queue.cancelAllOperations()
         lock.lock()
         state = .stopped
         lock.unlock()
